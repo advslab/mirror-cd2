@@ -1,7 +1,9 @@
 name: source probe
 
 # Manual only. Checks from a runner whether the paged advisory source answers,
-# how fast, and whether it gates the runner. Stores nothing.
+# how fast, and whether it gates the runner. Stores nothing. Mode `listing`
+# (the default) lists pages; mode `details` fetches the detail and links of
+# `count` records back to back and reports where the first human check came.
 # Set the repository secret SOURCE_BASE to the source's API base URL
 # (Settings → Secrets and variables → Actions → Secrets); it is masked in every log.
 on:
@@ -15,11 +17,19 @@ on:
         description: "seconds between requests"
         required: false
         default: "1"
+      mode:
+        description: "listing or details"
+        required: false
+        default: "listing"
+      count:
+        description: "records the details mode fetches (default 300)"
+        required: false
+        default: ""
 
 jobs:
   probe:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - name: refuse without the source secret
@@ -32,6 +42,8 @@ jobs:
           BASE: ${{ secrets.SOURCE_BASE }}
           WINDOW: ${{ inputs.window }}
           PACE: ${{ inputs.pace }}
+          MODE: ${{ inputs.mode }}
+          COUNT: ${{ inputs.count }}
         run: |
           chmod +x bin/source-probe
           sha256sum bin/source-probe
