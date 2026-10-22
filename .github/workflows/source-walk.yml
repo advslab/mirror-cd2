@@ -2,8 +2,16 @@ name: source walk
 
 # Walks the paged advisory source month by month, newest first, and keeps one
 # rolling release (tag `data`) of YYYY-MM.ndjson.gz files indexed by
-# state.json. Each run resumes where the last stopped, stops at its time
-# budget or on the source's human check, and publishes what it has.
+# state.json. Each run resumes where the last stopped, works in bursts with
+# pauses between them, waits out the source's human check and carries on,
+# stops at its time budget, and publishes what it has.
+#
+# Chaining: when a run ends with work left (its budget, or an error other than
+# a stall) and `chain` is above 0, it dispatches one follow-up run of this
+# workflow with chain - 1 and every other input unchanged. A run that stalls
+# (a human check twice with no progress between) or finishes asks for none.
+# The concurrency group keeps runs one at a time.
+#
 # Set the repository secret SOURCE_BASE to the source's API base URL
 # (Settings → Secrets and variables → Actions → Secrets); it is masked in every log.
 on:
@@ -11,6 +19,10 @@ on:
     - cron: "40 17 * * *"
   workflow_dispatch:
     inputs:
+      chain:
+        description: "how many follow-up runs may still follow this one"
+        required: false
+        default: "3"
       budget:
         description: "minutes the walk may run"
         required: false
@@ -19,9 +31,26 @@ on:
         description: "seconds between requests"
         required: false
         default: "1"
+      burst:
+        description: "listing calls per burst (default 15, 0 for none)"
+        required: false
+        default: ""
+      detail_burst:
+        description: "detail and links calls per burst (default 150, 0 for none)"
+        required: false
+        default: ""
+      gap:
+        description: "seconds between bursts (default 180)"
+        required: false
+        default: ""
+      cooldown:
+        description: "minutes to wait after a human check (default 30)"
+        required: false
+        default: ""
 
 permissions:
   contents: write
+  actions: write
 
 concurrency:
   group: walk
@@ -39,10 +68,16 @@ jobs:
         run: |
           if [ -z "$BASE" ]; then echo "::error::repository secret SOURCE_BASE is not set"; exit 1; fi
       - name: walk
+        id: walk
         env:
           BASE: ${{ secrets.SOURCE_BASE }}
           BUDGET: ${{ inputs.budget || '330' }}
           PACE: ${{ inputs.pace || '1' }}
+          BURST: ${{ inputs.burst }}
+          DETAIL_BURST: ${{ inputs.detail_burst }}
+          GAP: ${{ inputs.gap }}
+          COOLDOWN: ${{ inputs.cooldown }}
+          CHAIN: ${{ inputs.chain || '3' }}
           RELEASE_TAG: data
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
@@ -50,3 +85,24 @@ jobs:
           chmod +x bin/source-walk
           sha256sum bin/source-walk
           bin/source-walk
+          more=$(sed -n 's/^more=//p' "$GITHUB_OUTPUT" | tail -n 1)
+          if [ "$more" != true ] || [ "$CHAIN" -le 0 ]; then
+            echo "chain: no follow-up run requested (more=${more:-unset}, chain=$CHAIN)"
+          fi
+      - name: chain
+        if: ${{ success() && steps.walk.outputs.more == 'true' && fromJSON(inputs.chain || '3') > 0 }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CHAIN: ${{ inputs.chain || '3' }}
+          BUDGET: ${{ inputs.budget || '330' }}
+          PACE: ${{ inputs.pace || '1' }}
+          BURST: ${{ inputs.burst }}
+          DETAIL_BURST: ${{ inputs.detail_burst }}
+          GAP: ${{ inputs.gap }}
+          COOLDOWN: ${{ inputs.cooldown }}
+        run: |
+          left=$((CHAIN - 1))
+          gh workflow run source-walk.yml --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF_NAME" \
+            -f chain="$left" -f budget="$BUDGET" -f pace="$PACE" \
+            -f burst="$BURST" -f detail_burst="$DETAIL_BURST" -f gap="$GAP" -f cooldown="$COOLDOWN"
+          echo "chain: follow-up run requested; $left more may follow it"
