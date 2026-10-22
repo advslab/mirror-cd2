@@ -10,13 +10,18 @@ name: source walk
 # a stall) and `chain` is above 0, it dispatches one follow-up run of this
 # workflow with chain - 1 and every other input unchanged. A run that stalls
 # (a human check twice with no progress between) or finishes asks for none.
-# The concurrency group keeps runs one at a time.
+# The concurrency group keeps runs one at a time; during the backfill a
+# scheduled run queues behind the chain.
+#
+# Every 4 hours. Once the history is complete a run re-lists the newest two
+# months incrementally (it stops after 3 pages in a row with nothing new or
+# changed) and once a day in full, so most runs cost a few pages.
 #
 # Set the repository secret SOURCE_BASE to the source's API base URL
 # (Settings → Secrets and variables → Actions → Secrets); it is masked in every log.
 on:
   schedule:
-    - cron: "40 17 * * *"
+    - cron: "40 */4 * * *"
   workflow_dispatch:
     inputs:
       chain:
