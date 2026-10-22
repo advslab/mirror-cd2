@@ -17,6 +17,16 @@ name: source walk
 # months incrementally (it stops after 3 pages in a row with nothing new or
 # changed) and once a day in full, so most runs cost a few pages.
 #
+# Details first, links after: a record is written with null links; once every
+# month of the run's lane is complete, a links phase fills them in, newest
+# month first.
+#
+# Lanes: the `lane` input (YYYY-MM..YYYY-MM, newest first; one month is the
+# same month twice) runs a walk of that range only, side by side with the
+# whole-history walk the schedule runs (lane empty). Each lane keeps its own
+# lane-*.json in the release; state.json is rebuilt from all of them. Runs of
+# one lane never overlap; different lanes do. A chained run keeps its lane.
+#
 # Set the repository secret SOURCE_BASE to the source's API base URL
 # (Settings → Secrets and variables → Actions → Secrets); it is masked in every log.
 on:
@@ -28,6 +38,10 @@ on:
         description: "how many follow-up runs may still follow this one"
         required: false
         default: "3"
+      lane:
+        description: "months to walk, YYYY-MM..YYYY-MM newest first (empty: the whole history)"
+        required: false
+        default: ""
       budget:
         description: "minutes the walk may run"
         required: false
@@ -58,7 +72,7 @@ permissions:
   actions: write
 
 concurrency:
-  group: walk
+  group: walk-${{ inputs.lane || 'all' }}
   cancel-in-progress: false
 
 jobs:
@@ -83,6 +97,7 @@ jobs:
           GAP: ${{ inputs.gap }}
           COOLDOWN: ${{ inputs.cooldown }}
           CHAIN: ${{ inputs.chain || '3' }}
+          LANE: ${{ inputs.lane }}
           RELEASE_TAG: data
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
@@ -105,9 +120,11 @@ jobs:
           DETAIL_BURST: ${{ inputs.detail_burst }}
           GAP: ${{ inputs.gap }}
           COOLDOWN: ${{ inputs.cooldown }}
+          LANE: ${{ inputs.lane }}
         run: |
           left=$((CHAIN - 1))
           gh workflow run source-walk.yml --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF_NAME" \
             -f chain="$left" -f budget="$BUDGET" -f pace="$PACE" \
-            -f burst="$BURST" -f detail_burst="$DETAIL_BURST" -f gap="$GAP" -f cooldown="$COOLDOWN"
+            -f burst="$BURST" -f detail_burst="$DETAIL_BURST" -f gap="$GAP" -f cooldown="$COOLDOWN" \
+            -f lane="$LANE"
           echo "chain: follow-up run requested; $left more may follow it"
