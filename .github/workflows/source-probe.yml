@@ -1,0 +1,38 @@
+name: source probe
+
+# Manual only. Checks from a runner whether the paged advisory source answers,
+# how fast, and whether it gates the runner. Stores nothing.
+# Set the repository variable SOURCE_BASE to the source's API base URL
+# (Settings → Secrets and variables → Actions → Variables).
+on:
+  workflow_dispatch:
+    inputs:
+      window:
+        description: "yyyy-mm to list (default: last month)"
+        required: false
+        default: ""
+      pace:
+        description: "seconds between requests"
+        required: false
+        default: "1"
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: refuse without the source variable
+        if: ${{ vars.SOURCE_BASE == '' }}
+        run: |
+          echo "::error::repository variable SOURCE_BASE is not set"
+          exit 1
+      - name: probe
+        env:
+          BASE: ${{ vars.SOURCE_BASE }}
+          WINDOW: ${{ inputs.window }}
+          PACE: ${{ inputs.pace }}
+        run: |
+          chmod +x bin/source-probe
+          sha256sum bin/source-probe
+          bin/source-probe

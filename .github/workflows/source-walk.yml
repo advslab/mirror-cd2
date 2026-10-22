@@ -1,0 +1,52 @@
+name: source walk
+
+# Walks the paged advisory source month by month, newest first, and keeps one
+# rolling release (tag `data`) of YYYY-MM.ndjson.gz files indexed by
+# state.json. Each run resumes where the last stopped, stops at its time
+# budget or on the source's human check, and publishes what it has.
+# Set the repository variable SOURCE_BASE to the source's API base URL
+# (Settings → Secrets and variables → Actions → Variables).
+on:
+  schedule:
+    - cron: "40 17 * * *"
+  workflow_dispatch:
+    inputs:
+      budget:
+        description: "minutes the walk may run"
+        required: false
+        default: "330"
+      pace:
+        description: "seconds between requests"
+        required: false
+        default: "1"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: walk
+  cancel-in-progress: false
+
+jobs:
+  walk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+      - name: refuse without the source variable
+        if: ${{ vars.SOURCE_BASE == '' }}
+        run: |
+          echo "::error::repository variable SOURCE_BASE is not set"
+          exit 1
+      - name: walk
+        env:
+          BASE: ${{ vars.SOURCE_BASE }}
+          BUDGET: ${{ inputs.budget || '330' }}
+          PACE: ${{ inputs.pace || '1' }}
+          RELEASE_TAG: data
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          chmod +x bin/source-walk
+          sha256sum bin/source-walk
+          bin/source-walk
