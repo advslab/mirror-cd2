@@ -4,8 +4,8 @@ name: source walk
 # rolling release (tag `data`) of YYYY-MM.ndjson.gz files indexed by
 # state.json. Each run resumes where the last stopped, stops at its time
 # budget or on the source's human check, and publishes what it has.
-# Set the repository variable SOURCE_BASE to the source's API base URL
-# (Settings → Secrets and variables → Actions → Variables).
+# Set the repository secret SOURCE_BASE to the source's API base URL
+# (Settings → Secrets and variables → Actions → Secrets); it is masked in every log.
 on:
   schedule:
     - cron: "40 17 * * *"
@@ -33,14 +33,14 @@ jobs:
     timeout-minutes: 350
     steps:
       - uses: actions/checkout@v4
-      - name: refuse without the source variable
-        if: ${{ vars.SOURCE_BASE == '' }}
+      - name: refuse without the source secret
+        env:
+          BASE: ${{ secrets.SOURCE_BASE }}
         run: |
-          echo "::error::repository variable SOURCE_BASE is not set"
-          exit 1
+          if [ -z "$BASE" ]; then echo "::error::repository secret SOURCE_BASE is not set"; exit 1; fi
       - name: walk
         env:
-          BASE: ${{ vars.SOURCE_BASE }}
+          BASE: ${{ secrets.SOURCE_BASE }}
           BUDGET: ${{ inputs.budget || '330' }}
           PACE: ${{ inputs.pace || '1' }}
           RELEASE_TAG: data

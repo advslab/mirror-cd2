@@ -2,8 +2,8 @@ name: source probe
 
 # Manual only. Checks from a runner whether the paged advisory source answers,
 # how fast, and whether it gates the runner. Stores nothing.
-# Set the repository variable SOURCE_BASE to the source's API base URL
-# (Settings → Secrets and variables → Actions → Variables).
+# Set the repository secret SOURCE_BASE to the source's API base URL
+# (Settings → Secrets and variables → Actions → Secrets); it is masked in every log.
 on:
   workflow_dispatch:
     inputs:
@@ -22,14 +22,14 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - name: refuse without the source variable
-        if: ${{ vars.SOURCE_BASE == '' }}
+      - name: refuse without the source secret
+        env:
+          BASE: ${{ secrets.SOURCE_BASE }}
         run: |
-          echo "::error::repository variable SOURCE_BASE is not set"
-          exit 1
+          if [ -z "$BASE" ]; then echo "::error::repository secret SOURCE_BASE is not set"; exit 1; fi
       - name: probe
         env:
-          BASE: ${{ vars.SOURCE_BASE }}
+          BASE: ${{ secrets.SOURCE_BASE }}
           WINDOW: ${{ inputs.window }}
           PACE: ${{ inputs.pace }}
         run: |
