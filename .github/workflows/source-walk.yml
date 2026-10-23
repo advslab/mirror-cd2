@@ -55,7 +55,7 @@ on:
         required: false
         default: ""
       detail_burst:
-        description: "detail and links calls per burst (default 150, 0 for none)"
+        description: "detail and links calls per burst (default 0, no bursts)"
         required: false
         default: ""
       gap:
