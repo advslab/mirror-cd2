@@ -13,9 +13,11 @@ name: source walk
 # The concurrency group keeps runs one at a time; during the backfill a
 # scheduled run queues behind the chain.
 #
-# Every 4 hours. Once the history is complete a run re-lists the newest two
-# months incrementally (it stops after 3 pages in a row with nothing new or
-# changed) and once a day in full, so most runs cost a few pages.
+# Every 4 hours. Once the history (or a lane's range) is complete a run lists
+# the update window, the records updated since a day before the last window
+# began, newest update first, and fetches again those newer than the copy
+# held, into the month of their publish date; once a week the whole history's
+# run also re-lists the newest two months in full.
 #
 # Details first, links after: a record is written with null links; once every
 # month of the run's lane is complete, a links phase fills them in, newest
