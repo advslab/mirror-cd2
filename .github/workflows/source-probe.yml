@@ -3,7 +3,9 @@ name: source probe
 # Manual only. Checks from a runner whether the paged advisory source answers,
 # how fast, and whether it gates the runner. Stores nothing. Mode `listing`
 # (the default) lists pages; mode `details` fetches the detail and links of
-# `count` records back to back and reports where the first human check came.
+# `count` records back to back and reports where the first human check came;
+# mode `updates` lists pages sorted by update time, with and without a window
+# on update time over the last week, to see whether edits can be found.
 # Set the repository secret SOURCE_BASE to the source's API base URL
 # (Settings → Secrets and variables → Actions → Secrets); it is masked in every log.
 on:
@@ -18,7 +20,7 @@ on:
         required: false
         default: "1"
       mode:
-        description: "listing or details"
+        description: "listing, details or updates"
         required: false
         default: "listing"
       count:
