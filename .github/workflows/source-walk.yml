@@ -11,7 +11,8 @@ name: source walk
 # workflow with chain - 1 and every other input unchanged. A run that stalls
 # (a human check twice with no progress between) or finishes asks for none.
 # The concurrency group keeps runs one at a time; during the backfill a
-# scheduled run queues behind the chain.
+# scheduled run queues behind the chain. The default of 12 follow-ups (about three
+# days of 330-minute budgets) lets a backfill lane run unattended to its end.
 #
 # Every 4 hours. Once the history (or a lane's range) is complete a run lists
 # the update window, the records updated since a day before the last window
@@ -39,7 +40,7 @@ on:
       chain:
         description: "how many follow-up runs may still follow this one"
         required: false
-        default: "3"
+        default: "12"
       lane:
         description: "months to walk, YYYY-MM..YYYY-MM newest first (empty: the whole history)"
         required: false
@@ -98,7 +99,7 @@ jobs:
           DETAIL_BURST: ${{ inputs.detail_burst }}
           GAP: ${{ inputs.gap }}
           COOLDOWN: ${{ inputs.cooldown }}
-          CHAIN: ${{ inputs.chain || '3' }}
+          CHAIN: ${{ inputs.chain || '12' }}
           LANE: ${{ inputs.lane }}
           RELEASE_TAG: data
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -112,10 +113,10 @@ jobs:
             echo "chain: no follow-up run requested (more=${more:-unset}, chain=$CHAIN)"
           fi
       - name: chain
-        if: ${{ success() && steps.walk.outputs.more == 'true' && fromJSON(inputs.chain || '3') > 0 }}
+        if: ${{ success() && steps.walk.outputs.more == 'true' && fromJSON(inputs.chain || '12') > 0 }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CHAIN: ${{ inputs.chain || '3' }}
+          CHAIN: ${{ inputs.chain || '12' }}
           BUDGET: ${{ inputs.budget || '330' }}
           PACE: ${{ inputs.pace || '1' }}
           BURST: ${{ inputs.burst }}
